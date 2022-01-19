@@ -1,0 +1,8 @@
+# Ignore Mac system files
+.DS_store
+
+# Ignore all executables
+.ana*
+
+# Ignore pdf plots
+*.pdf
