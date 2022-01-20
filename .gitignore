@@ -3,6 +3,7 @@
 
 # Ignore all executables
 .ana*
+Calibrate
 
 # Ignore pdf plots
 *.pdf
