@@ -1,4 +1,4 @@
-# tunlAnalysis
+# TUNLAnalysis
 Scripts for TUNL 100Mo neutron activation analysis.
 
 There are two `c++` scripts (i) to calibrate, and (ii) to reduce root files -- from mvme -- to higher level analysis. You will need `ROOT` on your system to compile and run the scripts. Currently, the scripts are setup to work on files that are a collection of (Material, NeutronEnergy) run pairs. 
