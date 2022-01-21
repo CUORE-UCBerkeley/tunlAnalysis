@@ -59,8 +59,8 @@ int main(int argc, char **argv){
     std::string nameID;
     
     if(matname.compare("MoFoil") ==0 && energy == 6){
-        runnumbers = {58};
-        //runnumbers = {58, 59, 60, 61, 62, 63, 64, 65, 66};
+        //runnumbers = {58};
+        runnumbers = {58, 59, 60, 61, 62, 63, 64, 65, 66};
         nameID = "_MoFoil_6MeV";
     } else if(matname.compare("FeFoil") ==0 && energy == 6){
         runnumbers = {67, 77, 78};
