@@ -7,3 +7,4 @@ Calibrate
 
 # Ignore pdf plots
 *.pdf
+*.root
