@@ -103,7 +103,7 @@ int main(int argc, char **argv){
         }
     }
 
-    std::cout << energy << std::endl;
+   
     //Create a vector of run numbers 
     std::vector<int> runnumbers;
     std::string nameID;
@@ -148,8 +148,6 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
-    //TApplication to display output on screen
-    //TApplication app("app",0,0);
     
     //Add the files in a chain; tree name is SSA
     TChain *chain = new TChain("SSA");
@@ -175,7 +173,7 @@ int main(int argc, char **argv){
     }
 
     //Create a root file for storing the calibration graph and the fit to it
-    std::unique_ptr<TFile> calibFile( TFile::Open(Form("rootFiles/calibration%s.root",nameID.data()), "RECREATE") );
+    std::unique_ptr<TFile> calibFile( TFile::Open(Form("../processedFiles/calibration%s.root",nameID.data()), "RECREATE") );
     
     //Prepare containers to store the graphs and the fits
     std::vector<TGraphErrors *> gr(4);

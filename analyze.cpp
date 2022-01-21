@@ -10,6 +10,7 @@
 #include "TSpectrum.h"
 #include <ROOT/RDataFrame.hxx>
 #include <ROOT/RVec.hxx>
+#include "TF1.h"
 
 using namespace ROOT::VecOps;
 using RvecD = ROOT::RVec<double>;
@@ -50,12 +51,12 @@ int main(int argc, char **argv){
         }
     }
 
-    std::cout << energy << std::endl;
     //Create a vector of run numbers 
     std::vector<int> runnumbers;
     std::string nameID;
     
     if(matname.compare("MoFoil") ==0 && energy == 6){
+        //runnumbers = {58};
         runnumbers = {58, 59, 60, 61, 62, 63, 64, 65, 66};
         nameID = "_MoFoil_6MeV";
     } else if(matname.compare("FeFoil") ==0 && energy == 6){
@@ -90,65 +91,142 @@ int main(int argc, char **argv){
         nameID = "_Empty_4MeV";
     }
 
-    runnumbers = {58};
     if(runnumbers.size()==0){
         std::cout << "Please pass correct arguments with material and neutron energy." << std::endl ;
         exit(EXIT_FAILURE);
     }
-
-    //TApplication to diaplay output on screen
-    TApplication app("app",0,0);
-
-    
+   
     //Add the files in a chain; tree name is SSA
-    TChain chain("SSA");
+    TChain *chain = new TChain("SSA");
     for(auto &run: runnumbers){
-        chain.Add(Form("../root/root_data_SSA_%03d.bin_tree.root",run));
+        chain->Add(Form("../root/root_data_SSA_%03d.bin_tree.root",run));
     }
 
-    std::cout << chain.GetEntries() << std::endl;
+    std::cout << "Number of entries in the chained files: " << chain->GetEntries() << std::endl;
 
-    /////// Try something new ////
-    ROOT::EnableImplicitMT();
-    ROOT::RDataFrame df(chain);
-    auto h = df.Define("energy0", [](const RvecD &amplitude) { return amplitude[2]; }, {"amplitude"}).Histo1D("energy0");
-    h->Draw();
+    // Get the calibration from calibration root file 
+    std::string calibFilename = Form("rootFiles/calibration%s.root", nameID.data());
+    std::unique_ptr<TFile> calibFile( TFile::Open(calibFilename.data()) );
+    std::vector<TF1*> calib(4);
+    if(calibFile){
+        for(int i =0; i < 4 ; i++){
+            calib[i] = (TF1*)calibFile->Get(Form("calibFit_ch%d",2*i));
+            //calib[i]->Print();
+        }
+    }
+    calibFile->Close();
 
-    auto cutTOF = [](const RvecD ChannelTimes, const RvecD TriggerTimes){
-        return (ChannelTimes[0] - TriggerTimes[0]);
-    };
-    auto hTOF = df.Define("TOF_ch0", cutTOF, {"channel_time","trigger_time"})
-                  . Histo1D({"name", "title", 1000, -4000, 0},"TOF_ch0");
-    hTOF->Draw();
-
-    //////////////////////////////
-
-    // //Create canvas for diagnostic plots 
-    // auto c1 = new TCanvas("c1","c1", 1200, 800);
-    // c1->Divide(1,4);
-   
-    // //Take the raw amplitudes and put them in histograms
-    // std::vector<TH1F> hAmplitude;
-    // for(int i = 0; i < 4; i++){
-    //     c1->cd(i+1);
-    //     TH1F *h = new TH1F(Form("h%d",2*i),Form("h%d",2*i),10000,0,60000);
-    //     chain.Draw(Form("amplitude[0]:amplitude[2]:amplitude[4]:amplitude[6] \
-    //                      >>h%d",(2*i),(2*i)),"","goff");
-    //     hAmplitude.push_back(*h);
-    // }
-
-    // //Find peaks in the histogram for calibration
-    // // Use TSpectrum to find the peak candidates
-    // int npeaks = 20;
-    // TSpectrum *s = new TSpectrum(2*npeaks);
-    // int nfound = s->Search(&hAmplitude[0],2,"",0.005);
-    // printf("Found %d candidate peaks to fit\n",nfound);
-    // // Estimate background using TSpectrum::Background
-    // TH1 *hb = s->Background(&hAmplitude[0],20,"same");
-    // if (hb) c1->Update();
+    // Use TTree draw to extract the useful variables 
+    std::string var = "amplitude[0]:amplitude[2]:amplitude[4]:amplitude[6]:"
+             "channel_time[0]:channel_time[2]:channel_time[4]:channel_time[6]:"
+             "trigger_time[0]:"
+             "amplitude[14]";
     
+    ///Extremly important when the number of events are more than 1000000 and using TTree::Draw
+    chain->SetEstimate(-1);  
+    chain->Draw(var.data(),"","goff");
+    size_t nEntries = chain->GetSelectedRows();
+    std::cout << "Number of selected rows after event selection: " << nEntries << std::endl;
 
-    // c1->SaveAs("diagnosticPlots.pdf");
+    std::vector<double> amp_ch0(chain->GetVal(0), chain->GetVal(0) + nEntries);
+    std::vector<double> amp_ch2(chain->GetVal(1), chain->GetVal(1) + nEntries);
+    std::vector<double> amp_ch4(chain->GetVal(2), chain->GetVal(2) + nEntries);
+    std::vector<double> amp_ch6(chain->GetVal(3), chain->GetVal(3) + nEntries);
+    std::vector<double> time_ch0(chain->GetVal(4), chain->GetVal(4) + nEntries);
+    std::vector<double> time_ch2(chain->GetVal(5), chain->GetVal(5) + nEntries);
+    std::vector<double> time_ch4(chain->GetVal(6), chain->GetVal(6) + nEntries);
+    std::vector<double> time_ch6(chain->GetVal(7), chain->GetVal(7) + nEntries);
+    std::vector<double> time_trg(chain->GetVal(8), chain->GetVal(8) + nEntries);
+    std::vector<double> bci(chain->GetVal(9), chain->GetVal(9) + nEntries);
+
+    gDirectory->cd();
+    std::unique_ptr<TFile> reducedFile( TFile::Open(Form("../processedFiles/reduced%s.root",nameID.data()), "RECREATE") );
+    auto rtree = std::make_unique<TTree>("ssa", "ssa");
+    
+    double energy_ch0, energy_ch2, energy_ch4, energy_ch6;
+    double tof_ch0, tof_ch2, tof_ch4, tof_ch6;
+
+    rtree->Branch("energy_ch0", &energy_ch0);
+    rtree->Branch("energy_ch2", &energy_ch2);
+    rtree->Branch("energy_ch4", &energy_ch4);
+    rtree->Branch("energy_ch6", &energy_ch6);
+    rtree->Branch("tof_ch0", &tof_ch0);
+    rtree->Branch("tof_ch2", &tof_ch2);
+    rtree->Branch("tof_ch4", &tof_ch4);
+    rtree->Branch("tof_ch6", &tof_ch6);
+    
+    for(size_t i = 0; i < nEntries; i++){
         
-    app.Run();
+        energy_ch0 = calib[0]->Eval(amp_ch0[i]);
+        energy_ch2 = calib[1]->Eval(amp_ch2[i]);
+        energy_ch4 = calib[2]->Eval(amp_ch4[i]);
+        energy_ch6 = calib[3]->Eval(amp_ch6[i]);
+        tof_ch0 = time_ch0[i] - time_trg[i];
+        tof_ch2 = time_ch2[i] - time_trg[i];
+        tof_ch4 = time_ch4[i] - time_trg[i];
+        tof_ch6 = time_ch6[i] - time_trg[i];
+        rtree->Fill();
+
+    }
+    rtree->Write();
+
+    std::vector<TH1D*> hE(4);
+    std::vector<TH1D*> htof(4);
+    std::vector<TH1D*> hE_Prompt(4);
+    std::vector<TH1D*> hE_Early(4);
+    std::vector<TH1D*> hE_Late(4);
+    std::vector<TH1D*> hE_tofCorr(4);
+
+    //Lets make some histos 
+    for(int i = 0; i < 4; i++){
+        int kk = 2*i;
+        //Create and save energies of each detector
+        hE[i]= new TH1D(Form("hEnergy_ch%d",kk),Form("hEnergy_ch%d",kk), 10000, 0, 10000);
+        rtree->Draw(Form("energy_ch%d>>hEnergy_ch%d",kk,kk), "","goff");
+        hE[i]->Write();
+
+        //Create and save energies of TOF of each detector
+        htof[i]= new TH1D(Form("htof_ch%d",kk),Form("htof_ch%d",kk), 1000, -4000, 0);
+        rtree->Draw(Form("tof_ch%d>>htof_ch%d",kk,kk), "","goff");
+        htof[i]->Write();
+
+        //Get the peak position of TOF to make tof cuts
+        int binmax = htof[i]->GetMaximumBin(); 
+        double xbinmax = htof[i]->GetXaxis()->GetBinCenter(binmax);
+
+        //Define Prompt such that (xbinmax - 500) < TOF < (xbinmax + 500)
+        hE_Prompt[i]= new TH1D(Form("hE_Prompt_ch%d",kk),Form("hE_Prompt_ch%d",kk), 10000, 0, 10000);
+        rtree->Draw(Form("energy_ch%d>>hE_Prompt_ch%d",kk,kk), \
+                    Form("tof_ch%d < abs(%f - 500)", kk, xbinmax), \
+                    "goff");
+        double promptRange = 1000;
+        hE_Prompt[i]->Write();
+
+        //Define Early 
+        hE_Early[i]= new TH1D(Form("hE_Early_ch%d",kk),Form("hE_Early_ch%d",kk), 10000, 0, 10000);
+        rtree->Draw(Form("energy_ch%d>>hE_Early_ch%d",kk,kk), \
+                    Form("tof_ch%d > -4000 && tof_ch%d < (%f - 500)", kk, kk, xbinmax), \
+                    "goff");
+        double earlyRange = abs((-4000) - (xbinmax - 500));
+        hE_Early[i]->Write();
+
+        //Define Late 
+        hE_Late[i]= new TH1D(Form("hE_Late_ch%d",kk),Form("hE_Late_ch%d",kk), 10000, 0, 10000);
+        rtree->Draw(Form("energy_ch%d>>hE_Late_ch%d",kk,kk), \
+                    Form("tof_ch%d > -4100 && tof_ch%d < (%f - 500)", kk, kk, xbinmax), \
+                    "goff");
+        double lateRange = abs(0 - (xbinmax + 500));
+        hE_Late[i]->Write();
+       
+        //Estimate TOF corrected plot by subtracting accidental spectra from prompt spectra
+        hE_tofCorr[i]= new TH1D(Form("hE_tofCorr_ch%d",kk),Form("hE_tofCorr_ch%d",kk), 10000, 0, 10000);
+        hE_tofCorr[i]->Add(hE_Prompt[i], 1);
+        hE_tofCorr[i]->Add(hE_Early[i], - 0.5 * promptRange / earlyRange );
+        hE_tofCorr[i]->Add(hE_Late[i], - 0.5 * promptRange / lateRange );
+        hE_tofCorr[i]->Write();
+
+    }
+    
+    std::cout << "Closed the generated reduced file." << std::endl;
+        
 }
