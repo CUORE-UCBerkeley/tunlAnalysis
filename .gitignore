@@ -1,5 +1,6 @@
 # Ignore Mac system files
 .DS_store
+.vscode/
 
 # Ignore all executables
 analyze
