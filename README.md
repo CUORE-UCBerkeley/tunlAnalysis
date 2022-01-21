@@ -3,6 +3,11 @@ Scripts for TUNL 100Mo neutron activation analysis.
 
 There are two `c++` scripts (i) to calibrate, and (ii) to reduce root files -- from mvme -- to higher level analysis. You will need `ROOT` on your system to compile and run the scripts. Currently, the scripts are setup to work on files that are a collection of (Material, NeutronEnergy) run pairs. 
 
+Make sure that you create a folder before calling any of the script
+``` $ mkdir ../processedFiles ```
+
+This is where the calibration and other root files will be saved.
+
 # Calibration
 
 Currently, the calibration is done for all 4 detectors on the cumulative raw amplitude spectra for the collection of runs. The calibration, for now, is done only on 511-kev, 1460-keV, and 2615-keV, only. If you want to add more lines for calibration, you should edit, compile, and run the `Calibrate.cpp` file. 
