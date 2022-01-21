@@ -23,7 +23,10 @@ void print_usage() {
             << "Note: Not all combinations are possible. Refer to spreadsheet." << "\n";
 }
 
-int main(int argc, char **argv){
+int main(int argc, char **argv){    
+    
+    // This activates implicit multi-threading
+    ROOT::EnableImplicitMT();
 
     std::string matname;
     double energy;
