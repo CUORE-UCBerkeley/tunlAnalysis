@@ -59,8 +59,8 @@ int main(int argc, char **argv){
     std::string nameID;
     
     if(matname.compare("MoFoil") ==0 && energy == 6){
-        //runnumbers = {58};
-        runnumbers = {58, 59, 60, 61, 62, 63, 64, 65, 66};
+        runnumbers = {58};
+        //runnumbers = {58, 59, 60, 61, 62, 63, 64, 65, 66};
         nameID = "_MoFoil_6MeV";
     } else if(matname.compare("FeFoil") ==0 && energy == 6){
         runnumbers = {67, 77, 78};
@@ -108,7 +108,7 @@ int main(int argc, char **argv){
     std::cout << "Number of entries in the chained files: " << chain->GetEntries() << std::endl;
 
     // Get the calibration from calibration root file 
-    std::string calibFilename = Form("rootFiles/calibration%s.root", nameID.data());
+    std::string calibFilename = Form("../processedFiles/calibration%s.root", nameID.data());
     std::unique_ptr<TFile> calibFile( TFile::Open(calibFilename.data()) );
     std::vector<TF1*> calib(4);
     if(calibFile){
@@ -146,28 +146,40 @@ int main(int argc, char **argv){
     std::unique_ptr<TFile> reducedFile( TFile::Open(Form("../processedFiles/reduced%s.root",nameID.data()), "RECREATE") );
     auto rtree = std::make_unique<TTree>("ssa", "ssa");
     
-    double energy_ch0, energy_ch2, energy_ch4, energy_ch6;
-    double tof_ch0, tof_ch2, tof_ch4, tof_ch6;
+    std::vector<double> energy_ch(4);
+    std::vector<double> tof_ch(4);
 
-    rtree->Branch("energy_ch0", &energy_ch0);
-    rtree->Branch("energy_ch2", &energy_ch2);
-    rtree->Branch("energy_ch4", &energy_ch4);
-    rtree->Branch("energy_ch6", &energy_ch6);
-    rtree->Branch("tof_ch0", &tof_ch0);
-    rtree->Branch("tof_ch2", &tof_ch2);
-    rtree->Branch("tof_ch4", &tof_ch4);
-    rtree->Branch("tof_ch6", &tof_ch6);
+    rtree->Branch("energy_ch0", &energy_ch[0]);
+    rtree->Branch("energy_ch2", &energy_ch[1]);
+    rtree->Branch("energy_ch4", &energy_ch[2]);
+    rtree->Branch("energy_ch6", &energy_ch[3]);
+    rtree->Branch("tof_ch0", &tof_ch[0]);
+    rtree->Branch("tof_ch2", &tof_ch[1]);
+    rtree->Branch("tof_ch4", &tof_ch[2]);
+    rtree->Branch("tof_ch6", &tof_ch[3]);
     
     for(size_t i = 0; i < nEntries; i++){
         
-        energy_ch0 = calib[0]->Eval(amp_ch0[i]);
-        energy_ch2 = calib[1]->Eval(amp_ch2[i]);
-        energy_ch4 = calib[2]->Eval(amp_ch4[i]);
-        energy_ch6 = calib[3]->Eval(amp_ch6[i]);
-        tof_ch0 = time_ch0[i] - time_trg[i];
-        tof_ch2 = time_ch2[i] - time_trg[i];
-        tof_ch4 = time_ch4[i] - time_trg[i];
-        tof_ch6 = time_ch6[i] - time_trg[i];
+        energy_ch[0] = calib[0]->Eval(amp_ch0[i]);
+        energy_ch[1] = calib[1]->Eval(amp_ch2[i]);
+        energy_ch[2] = calib[2]->Eval(amp_ch4[i]);
+        energy_ch[3] = calib[3]->Eval(amp_ch6[i]);
+        tof_ch[0] = time_ch0[i] - time_trg[i];
+        tof_ch[1] = time_ch2[i] - time_trg[i];
+        tof_ch[2] = time_ch4[i] - time_trg[i];
+        tof_ch[3] = time_ch6[i] - time_trg[i];
+
+        //Bump up the satellite tof peaks to main peak between -4096 and 0
+        //Due to some DAQ error the satellite peaks are shifted by multiples of 4096.
+        // We correct that here.
+        for(int jj = 0; jj < 5 ; jj++){
+            for(int kk = 0; kk < 4; kk++){
+                if( (-((jj+1) * 4096) < tof_ch[kk]) &&  (tof_ch[kk] <= -(jj*4096)) ){
+                    tof_ch[kk] += (jj * 4096);
+                }
+            }
+        }
+        
         rtree->Fill();
 
     }
@@ -189,7 +201,7 @@ int main(int argc, char **argv){
         hE[i]->Write();
 
         //Create and save energies of TOF of each detector
-        htof[i]= new TH1D(Form("htof_ch%d",kk),Form("htof_ch%d",kk), 1000, -4000, 0);
+        htof[i]= new TH1D(Form("htof_ch%d",kk),Form("htof_ch%d",kk), 1000, -4096, 0);
         rtree->Draw(Form("tof_ch%d>>htof_ch%d",kk,kk), "","goff");
         htof[i]->Write();
 
