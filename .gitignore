@@ -2,9 +2,11 @@
 .DS_store
 
 # Ignore all executables
-.ana*
-Calibrate
+analyze
+calibrate
 
 # Ignore pdf plots
 *.pdf
 *.root
+
+
