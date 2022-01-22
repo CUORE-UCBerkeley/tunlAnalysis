@@ -4,6 +4,8 @@
 #include <tuple>
 #include <getopt.h>
 #include <stdio.h>
+#include <sstream>
+#include <string>
 
 
 #include "TChain.h"
@@ -68,23 +70,22 @@ std::tuple<TGraphErrors*, TF1*> Calibrate( TH1D *hist, int channel){
 }
 
 void print_usage() {
-  std::cout << "Usage: ./Calibrate --material c --energy i" << "\n" 
-            << "Choose from the following : " << "\n"  
-            << "material: {MoFoil,MoPowder,Fe,Cu,Empty}" << "\n" 
-            << "energy: {0,4,6,8}" <<  "\n" 
-            << "Note: Not all combinations are possible. Refer to spreadsheet." << "\n";
+  std::cout << "Usage: ./calibrate --material c --energy i -r run1,run2,run3\n" ;
 }
 
-int main(int argc, char **argv){
+int main(int argc, char **argv){    
+    
+    // This activates implicit multi-threading
+    ROOT::EnableImplicitMT();
 
     std::string matname;
-    double energy;
-    double energies[4]={0.,4.3,5.9,8};
-    const char* pnames[5] = {"MoFoil","MoPowder","Fe","Cu","Blank"};
+    int energy;
+    std::string runs;
 
     static struct option long_options[] = {
         {"material",   required_argument, 0, 'c'  },
         {"energy"  ,   required_argument, 0, 'p'  },
+        {"runs"    ,   required_argument, 0, 'r'  },
     };
 
     int long_index =0;
@@ -98,53 +99,31 @@ int main(int argc, char **argv){
         case 'p' :
             energy = atoi(optarg);
             break;
+        case 'r' :
+            runs = std::string(optarg);
+            break;
         default: print_usage();
                 exit(EXIT_FAILURE);
         }
     }
 
-   
+    //create a nameID for storing files
+    std::string nameID = Form("_%s_%dMeV",matname.data(),energy);
+
     //Create a vector of run numbers 
     std::vector<int> runnumbers;
-    std::string nameID;
     
-    if(matname.compare("MoFoil") ==0 && energy == 6){
-        runnumbers = {58, 59, 60, 61, 62, 63, 64, 65, 66};
-        nameID = "_MoFoil_6MeV";
-    } else if(matname.compare("FeFoil") ==0 && energy == 6){
-        runnumbers = {67, 77, 78};
-        nameID = "_FeFoil_6MeV";
-    } else if(matname.compare("MoPowder") ==0 && energy == 0){
-        runnumbers = {68, 72, 76, 85};
-        nameID = "_MoFoil_NoBeam";
-    } else if(matname.compare("MoPowder") ==0 && energy == 6){
-        runnumbers = {69, 70, 71, 73, 74, 75};
-        nameID = "_MoPowder_6MeV";
-    } else if(matname.compare("Empty") ==0 && energy == 6){
-        runnumbers = {79};
-        nameID = "_Empty_6MeV";
-    } else if(matname.compare("Cu") ==0 && energy == 6){
-        runnumbers = {80};
-        nameID = "_Cu_6MeV";
-    } else if(matname.compare("MoPowder") ==0 && energy == 8){
-        runnumbers = {81, 82, 83, 84, 86};
-        nameID = "_MoPowder_8MeV";
-    } else if(matname.compare("FeFoil") ==0 && energy == 8){
-        runnumbers = {87};
-        nameID = "_FeFoil_8MeV";
-    } else if(matname.compare("FeFoil") ==0 && energy == 4){
-        runnumbers = {88};
-        nameID = "_FeFoil_4MeV";
-    } else if(matname.compare("MoPowder") ==0 && energy == 4){
-        runnumbers = {89,90};
-        nameID = "_MoPowder_4MeV";
-    } else if(matname.compare("Empty") ==0 && energy == 4){
-        runnumbers = {91};
-        nameID = "_Empty_4MeV";
+    //Parse the list of runs to runnumbers
+    char delimiter = ',';
+    size_t pos = 0;
+     std::stringstream sstream(runs);
+    std::string temp;
+    while (std::getline(sstream, temp, delimiter)){
+        runnumbers.push_back(std::stoi(temp));
     }
 
     if(runnumbers.size()==0){
-        std::cout << "Please pass correct arguments with material and neutron energy." << std::endl ;
+        std::cout << "Please pass correct arguments" << std::endl ;
         exit(EXIT_FAILURE);
     }
 

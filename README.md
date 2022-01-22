@@ -14,7 +14,7 @@ Currently, the calibration is done for all 4 detectors on the cumulative raw amp
 
 ``` g++ Calibrate.cpp `root-config --glibs --cflags` -lSpectrum -o calibrate ``` 
 
-```./calibrate --material MoPowder --energy 6```
+```./calibrate --material MoFoil --energy 6 -r 58,59,60```
 
 Note that not all material energy combinations are possible. Please refer to spreadsheet to make sure you know what files you are processing. You can also make your own list with the right run numbers. 
 
@@ -24,6 +24,6 @@ This script produces a root files which contains a tree with `energy` and `tof` 
 
 ``` g++ Analyze.cpp `root-config --glibs --cflags` -lSpectrum -o analyze ``` 
 
-```./analyze --material MoPowder --energy 6```
+```./analyze --material MoPowder --energy 6 -r 58,59,60```
 
 
