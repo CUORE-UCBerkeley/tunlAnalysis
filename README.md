@@ -16,7 +16,7 @@ Currently, the calibration is done for all 4 detectors on the cumulative raw amp
 
 ```./calibrate --material MoFoil --energy 6 -r 58,59,60```
 
-Note that not all material energy combinations are possible. Please refer to spreadsheet to make sure you know what files you are processing. You can also make your own list with the right run numbers. 
+Note that not all material energy combinations are possible. Please refer to spreadsheet to make sure you know what files you are processing. You can also make your own list with the right run numbers. Please make sure that the `run` numbers are comma-separated and without any spaces.
 
 # Analyze 
 
