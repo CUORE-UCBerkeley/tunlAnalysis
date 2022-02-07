@@ -1,5 +1,5 @@
-RUNS="69,70,71,73,74,75"
+RUNS="89,90"
 MATERIAL="MoPowder"
-ENERGY="6"
+ENERGY="4"
 ./calibrate --material $MATERIAL --energy $ENERGY -r $RUNS
 ./analyze --material $MATERIAL --energy $ENERGY -r $RUNS
