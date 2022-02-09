@@ -75,6 +75,7 @@ void print_usage() {
 
 int main(int argc, char **argv){    
     
+    std::cout << "Entering the calibration script ... " << std::endl;
     // This activates implicit multi-threading
     ROOT::EnableImplicitMT();
 
@@ -164,6 +165,7 @@ int main(int argc, char **argv){
         calibFile->WriteObject(fit[i],Form("calibFit_ch%d",2*i)); //Write to root file
     }
     calibFile->Close();
-        
+    
+    std::cout << ".... exiting the calibration script." << std::endl;
     //app.Run();
 }

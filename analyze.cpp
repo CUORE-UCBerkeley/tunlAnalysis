@@ -3,7 +3,7 @@
 #include <getopt.h>
 #include <stdio.h>
 
-#include "TChain.h"
+#include "TTree.h"
 #include "TCanvas.h"
 #include "TApplication.h"
 #include "TH1F.h"
@@ -20,6 +20,8 @@ void print_usage() {
 }
 
 int main(int argc, char **argv){    
+
+    std::cout << "Entering the analyze module ... " << std::endl;
     
     // This activates implicit multi-threading
     ROOT::EnableImplicitMT();
@@ -62,7 +64,7 @@ int main(int argc, char **argv){
     //Parse the list of runs to runnumbers
     char delimiter = ',';
     size_t pos = 0;
-     std::stringstream sstream(runs);
+    std::stringstream sstream(runs);
     std::string temp;
     while (std::getline(sstream, temp, delimiter)){
         runnumbers.push_back(std::stoi(temp));
@@ -73,14 +75,6 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
    
-    //Add the files in a chain; tree name is SSA
-    TChain *chain = new TChain("SSA");
-    for(auto &run: runnumbers){
-        chain->Add(Form("../root/root_data_SSA_%03d.bin_tree.root",run));
-    }
-
-    std::cout << "Number of entries in the chained files: " << chain->GetEntries() << std::endl;
-
     // Get the calibration from calibration root file 
     std::string calibFilename = Form("../processedFiles/calibration%s.root", nameID.data());
     std::unique_ptr<TFile> calibFile( TFile::Open(calibFilename.data()) );
@@ -88,76 +82,85 @@ int main(int argc, char **argv){
     if(calibFile){
         for(int i =0; i < 4 ; i++){
             calib[i] = (TF1*)calibFile->Get(Form("calibFit_ch%d",2*i));
-            //calib[i]->Print();
         }
     }
     calibFile->Close();
 
-    // Use TTree draw to extract the useful variables 
+    gDirectory->cd();
+    //Create the root file for writing the reduced data
+    std::unique_ptr<TFile> reducedFile( TFile::Open(Form("../processedFiles/reduced%s.root",nameID.data()), "RECREATE") );
+    auto outTree = std::make_unique<TTree>("ssa", "ssa");
+    
+    std::vector<double> energy_ch(4);
+    std::vector<double> tof_ch(4);
+    int runNum;
+
+    outTree->Branch("energy_ch0", &energy_ch[0]);
+    outTree->Branch("energy_ch2", &energy_ch[1]);
+    outTree->Branch("energy_ch4", &energy_ch[2]);
+    outTree->Branch("energy_ch6", &energy_ch[3]);
+    outTree->Branch("tof_ch0", &tof_ch[0]);
+    outTree->Branch("tof_ch2", &tof_ch[1]);
+    outTree->Branch("tof_ch4", &tof_ch[2]);
+    outTree->Branch("tof_ch6", &tof_ch[3]);
+    outTree->Branch("run", &runNum);
+
+    // We will use TTree draw to extract the useful variables
+    // Create a list of variables for the tree
     std::string var = "amplitude[0]:amplitude[2]:amplitude[4]:amplitude[6]:"
              "channel_time[0]:channel_time[2]:channel_time[4]:channel_time[6]:"
              "trigger_time[0]:"
              "amplitude[14]";
-    
-    ///Extremly important when the number of events are more than 1000000 and using TTree::Draw
-    chain->SetEstimate(-1);  
-    chain->Draw(var.data(),"","goff");
-    size_t nEntries = chain->GetSelectedRows();
-    std::cout << "Number of selected rows after event selection: " << nEntries << std::endl;
 
-    std::vector<double> amp_ch0(chain->GetVal(0), chain->GetVal(0) + nEntries);
-    std::vector<double> amp_ch2(chain->GetVal(1), chain->GetVal(1) + nEntries);
-    std::vector<double> amp_ch4(chain->GetVal(2), chain->GetVal(2) + nEntries);
-    std::vector<double> amp_ch6(chain->GetVal(3), chain->GetVal(3) + nEntries);
-    std::vector<double> time_ch0(chain->GetVal(4), chain->GetVal(4) + nEntries);
-    std::vector<double> time_ch2(chain->GetVal(5), chain->GetVal(5) + nEntries);
-    std::vector<double> time_ch4(chain->GetVal(6), chain->GetVal(6) + nEntries);
-    std::vector<double> time_ch6(chain->GetVal(7), chain->GetVal(7) + nEntries);
-    std::vector<double> time_trg(chain->GetVal(8), chain->GetVal(8) + nEntries);
-    std::vector<double> bci(chain->GetVal(9), chain->GetVal(9) + nEntries);
+    //loop over all runnumber files and get the required quantities 
+    for(auto run: runnumbers){
 
-    gDirectory->cd();
-    std::unique_ptr<TFile> reducedFile( TFile::Open(Form("../processedFiles/reduced%s.root",nameID.data()), "RECREATE") );
-    auto rtree = std::make_unique<TTree>("ssa", "ssa");
-    
-    std::vector<double> energy_ch(4);
-    std::vector<double> tof_ch(4);
+        std::unique_ptr<TFile> inFile( TFile::Open( Form("../root/root_data_SSA_%03d.bin_tree.root",run)) );
+        auto inTree = inFile->Get<TTree>("SSA");
+        runNum = run;
+        inTree->SetEstimate(-1);  ///Extremly important when the number of events are more than 1000000 and using TTree::Draw
+        inTree->Draw(var.data(),"","goff");
+        size_t nEntries = inTree->GetSelectedRows();
+        std::cout << "Run Number = " << run << "\t" << " Number of selected rows: " << nEntries << std::endl;
+        std::vector<double> amp_ch0(inTree->GetVal(0), inTree->GetVal(0) + nEntries);
+        std::vector<double> amp_ch2(inTree->GetVal(1), inTree->GetVal(1) + nEntries);
+        std::vector<double> amp_ch4(inTree->GetVal(2), inTree->GetVal(2) + nEntries);
+        std::vector<double> amp_ch6(inTree->GetVal(3), inTree->GetVal(3) + nEntries);
+        std::vector<double> time_ch0(inTree->GetVal(4), inTree->GetVal(4) + nEntries);
+        std::vector<double> time_ch2(inTree->GetVal(5), inTree->GetVal(5) + nEntries);
+        std::vector<double> time_ch4(inTree->GetVal(6), inTree->GetVal(6) + nEntries);
+        std::vector<double> time_ch6(inTree->GetVal(7), inTree->GetVal(7) + nEntries);
+        std::vector<double> time_trg(inTree->GetVal(8), inTree->GetVal(8) + nEntries);
+        std::vector<double> bci(inTree->GetVal(9), inTree->GetVal(9) + nEntries);
 
-    rtree->Branch("energy_ch0", &energy_ch[0]);
-    rtree->Branch("energy_ch2", &energy_ch[1]);
-    rtree->Branch("energy_ch4", &energy_ch[2]);
-    rtree->Branch("energy_ch6", &energy_ch[3]);
-    rtree->Branch("tof_ch0", &tof_ch[0]);
-    rtree->Branch("tof_ch2", &tof_ch[1]);
-    rtree->Branch("tof_ch4", &tof_ch[2]);
-    rtree->Branch("tof_ch6", &tof_ch[3]);
-    
-    for(size_t i = 0; i < nEntries; i++){
-        
-        energy_ch[0] = calib[0]->Eval(amp_ch0[i]);
-        energy_ch[1] = calib[1]->Eval(amp_ch2[i]);
-        energy_ch[2] = calib[2]->Eval(amp_ch4[i]);
-        energy_ch[3] = calib[3]->Eval(amp_ch6[i]);
-        tof_ch[0] = time_ch0[i] - time_trg[i];
-        tof_ch[1] = time_ch2[i] - time_trg[i];
-        tof_ch[2] = time_ch4[i] - time_trg[i];
-        tof_ch[3] = time_ch6[i] - time_trg[i];
+         for(int64_t i = 0; i < nEntries; i++){
+            energy_ch[0] = calib[0]->Eval(amp_ch0[i]);
+            energy_ch[1] = calib[1]->Eval(amp_ch2[i]);
+            energy_ch[2] = calib[2]->Eval(amp_ch4[i]);
+            energy_ch[3] = calib[3]->Eval(amp_ch6[i]);
+            tof_ch[0] = time_ch0[i] - time_trg[i];
+            tof_ch[1] = time_ch2[i] - time_trg[i];
+            tof_ch[2] = time_ch4[i] - time_trg[i];
+            tof_ch[3] = time_ch6[i] - time_trg[i];
 
-        //Bump up the satellite tof peaks to main peak between -4096 and 0
-        //Due to some DAQ error the satellite peaks are shifted by multiples of 4096.
-        // We correct that here.
-        for(int jj = 0; jj < 5 ; jj++){
-            for(int kk = 0; kk < 4; kk++){
-                if( (-((jj+1) * 4096) < tof_ch[kk]) &&  (tof_ch[kk] <= -(jj*4096)) ){
-                    tof_ch[kk] += (jj * 4096);
+            //Bump up the satellite tof peaks to main peak between -4096 and 0
+            //Due to some DAQ error the satellite peaks are shifted by multiples of 4096.
+            // We correct that here.
+            for(int jj = 0; jj < 5 ; jj++){
+                for(int kk = 0; kk < 4; kk++){
+                    if( (-((jj+1) * 4096) < tof_ch[kk]) &&  (tof_ch[kk] <= -(jj*4096)) ){
+                        tof_ch[kk] += (jj * 4096);
+                    }
                 }
             }
+
+            outTree->Fill();
+
         }
-        
-        rtree->Fill();
 
     }
-    rtree->Write();
+    reducedFile->cd();
+    outTree->Write();
 
     std::vector<TH1D*> hE(4);
     std::vector<TH1D*> htof(4);
@@ -171,12 +174,12 @@ int main(int argc, char **argv){
         int kk = 2*i;
         //Create and save energies of each detector
         hE[i]= new TH1D(Form("hEnergy_ch%d",kk),Form("hEnergy_ch%d",kk), 10000, 0, 10000);
-        rtree->Draw(Form("energy_ch%d>>hEnergy_ch%d",kk,kk), "","goff");
+        outTree->Draw(Form("energy_ch%d>>hEnergy_ch%d",kk,kk), "","goff");
         hE[i]->Write();
 
         //Create and save energies of TOF of each detector
         htof[i]= new TH1D(Form("htof_ch%d",kk),Form("htof_ch%d",kk), 1000, -4096, 0);
-        rtree->Draw(Form("tof_ch%d>>htof_ch%d",kk,kk), "","goff");
+        outTree->Draw(Form("tof_ch%d>>htof_ch%d",kk,kk), "","goff");
         htof[i]->Write();
 
         //Get the peak position of TOF to make tof cuts
@@ -185,7 +188,7 @@ int main(int argc, char **argv){
 
         //Define Prompt such that (xbinmax - 500) < TOF < (xbinmax + 500)
         hE_Prompt[i]= new TH1D(Form("hE_Prompt_ch%d",kk),Form("hE_Prompt_ch%d",kk), 10000, 0, 10000);
-        rtree->Draw(Form("energy_ch%d>>hE_Prompt_ch%d",kk,kk), \
+        outTree->Draw(Form("energy_ch%d>>hE_Prompt_ch%d",kk,kk), \
                     Form("tof_ch%d < abs(%f - 500)", kk, xbinmax), \
                     "goff");
         double promptRange = 1000;
@@ -193,7 +196,7 @@ int main(int argc, char **argv){
 
         //Define Early 
         hE_Early[i]= new TH1D(Form("hE_Early_ch%d",kk),Form("hE_Early_ch%d",kk), 10000, 0, 10000);
-        rtree->Draw(Form("energy_ch%d>>hE_Early_ch%d",kk,kk), \
+        outTree->Draw(Form("energy_ch%d>>hE_Early_ch%d",kk,kk), \
                     Form("tof_ch%d > -4000 && tof_ch%d < (%f - 500)", kk, kk, xbinmax), \
                     "goff");
         double earlyRange = abs((-4000) - (xbinmax - 500));
@@ -201,7 +204,7 @@ int main(int argc, char **argv){
 
         //Define Late 
         hE_Late[i]= new TH1D(Form("hE_Late_ch%d",kk),Form("hE_Late_ch%d",kk), 10000, 0, 10000);
-        rtree->Draw(Form("energy_ch%d>>hE_Late_ch%d",kk,kk), \
+        outTree->Draw(Form("energy_ch%d>>hE_Late_ch%d",kk,kk), \
                     Form("tof_ch%d > -4100 && tof_ch%d < (%f - 500)", kk, kk, xbinmax), \
                     "goff");
         double lateRange = abs(0 - (xbinmax + 500));
@@ -217,5 +220,6 @@ int main(int argc, char **argv){
     }
     
     std::cout << "Closed the generated reduced file." << std::endl;
+    std::cout << ".... exiting the analyze module." << std::endl;
         
 }
