@@ -68,7 +68,7 @@ int main(int argc, char **argv){
         std::cout << "Using calibration from " << calibID << ".root" << std::endl;
     } else {
         calibID = Form("calibration_%s_%dMeV",matname.data(),energy);
-        std::cout << "Using calibration from calibration" << calibID << ".root" << std::endl;
+        std::cout << "Using calibration from " << calibID << ".root" << std::endl;
     }
 
     //Create a vector of run numbers 
