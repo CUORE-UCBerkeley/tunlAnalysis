@@ -16,7 +16,7 @@ using namespace ROOT::VecOps;
 using RvecD = ROOT::RVec<double>;
 
 void print_usage() {
-  std::cout << "Usage: ./calibrate --material c --energy i -r run1,run2,run3 \n" ; 
+  std::cout << "Usage: ./calibrate --material c --energy i --runs run1,run2,run3 --fCalib C\n" ; 
 }
 
 int main(int argc, char **argv){    
@@ -29,11 +29,13 @@ int main(int argc, char **argv){
     std::string matname;
     int energy;
     std::string runs;
+    std::string fCalib;
 
     static struct option long_options[] = {
-        {"material",   required_argument, 0, 'c'  },
-        {"energy"  ,   required_argument, 0, 'p'  },
-        {"runs"    ,   required_argument, 0, 'r'  },
+        {"material"     ,   required_argument, 0, 'c'  },
+        {"energy"       ,   required_argument, 0, 'p'  },
+        {"runs"         ,   required_argument, 0, 'r'  },
+        {"fCalib"       ,   required_argument, 0, 'C'  },
     };
 
     int long_index =0;
@@ -50,6 +52,9 @@ int main(int argc, char **argv){
         case 'r' :
             runs = std::string(optarg);
             break;
+        case 'C' :
+            fCalib = std::string(optarg);
+        break;
         default: print_usage();
                 exit(EXIT_FAILURE);
         }
@@ -57,6 +62,14 @@ int main(int argc, char **argv){
 
     //create a nameID for storing files
     std::string nameID = Form("_%s_%dMeV",matname.data(),energy);
+    std::string calibID;
+    if(!fCalib.empty()){
+        calibID = fCalib;
+        std::cout << "Using calibration from " << calibID << ".root" << std::endl;
+    } else {
+        calibID = Form("calibration_%s_%dMeV",matname.data(),energy);
+        std::cout << "Using calibration from calibration" << calibID << ".root" << std::endl;
+    }
 
     //Create a vector of run numbers 
     std::vector<int> runnumbers;
@@ -76,7 +89,7 @@ int main(int argc, char **argv){
     }
    
     // Get the calibration from calibration root file 
-    std::string calibFilename = Form("../processedFiles/calibration%s.root", nameID.data());
+    std::string calibFilename = Form("../processedFiles/%s.root", calibID.data());
     std::unique_ptr<TFile> calibFile( TFile::Open(calibFilename.data()) );
     std::vector<TF1*> calib(4);
     if(calibFile){

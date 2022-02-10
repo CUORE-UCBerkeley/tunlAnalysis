@@ -36,18 +36,25 @@ std::tuple<double, double>  GetMaxInRange(TH1D *hist, double xlow, double xhigh)
 
 }
 
-std::tuple<TGraphErrors*, TF1*> Calibrate( TH1D *hist, int channel){
+std::tuple<TGraphErrors*, TF1*> Calibrate( TH1D *hist, int channel, int energy){
     
     //Define containers for energy and amplitude position
     std::vector<double> energies{510.998, 1460.820, 2614.511};
     std::vector<double> xpos(3);
     std::vector<double> xposErr(3);
     
-    //Find peaks in the histogram for calibration
+    //Find peaks in the histogram for calibratio
     //Unpack the tuple elements returned by the function 
-    std::tie(xpos[0], xposErr[0]) = GetMaxInRange(hist, 5000, 6000);   //Get 511 position
-    std::tie(xpos[1], xposErr[1]) = GetMaxInRange(hist, 14500, 15500); //Get 1460 position
-    std::tie(xpos[2], xposErr[2]) = GetMaxInRange(hist, 26500, 27500); //Get 2615 position
+    if(energy == 6 ){
+        std::tie(xpos[0], xposErr[0]) = GetMaxInRange(hist, 4000, 7000);   //Get 511 position
+        std::tie(xpos[1], xposErr[1]) = GetMaxInRange(hist, 13000, 16000); //Get 1460 position
+        std::tie(xpos[2], xposErr[2]) = GetMaxInRange(hist, 25000, 28000); //Get 2615 position
+    } else { // Other energies were taking with a different ADC range settings
+        std::tie(xpos[0], xposErr[0]) = GetMaxInRange(hist, 2000, 4000);   //Get 511 position
+        std::tie(xpos[1], xposErr[1]) = GetMaxInRange(hist, 8000, 10000); //Get 1460 position
+        std::tie(xpos[2], xposErr[2]) = GetMaxInRange(hist, 15000, 17000); //Get 2615 position
+    }
+    
 
     auto calibPlot = new TGraphErrors(xpos.size(), &xpos[0], &energies[0], &xposErr[0] , 0);
     calibPlot->Draw();
@@ -147,7 +154,7 @@ int main(int argc, char **argv){
         int kk = 2 * i; //Takes care of the fact that detector numbers are 0, 2, 4, 6
 
         //Fill in the raw spectra; We will use it for calibration
-        hAmpRaw.push_back(new TH1D(Form("hAmpRaw%d", kk),Form("hAmpRaw%d", kk),60000,0,60000));
+        hAmpRaw.push_back(new TH1D(Form("hAmpRaw%d", kk),Form("hAmpRaw%d", kk),100000,0,100000));
         chain->Draw(Form("amplitude[%d]>>hAmpRaw%d",kk,kk),"", "goff");
 
     }
@@ -160,7 +167,7 @@ int main(int argc, char **argv){
     std::vector<TF1 *> fit(4);
 
     for(int i = 0; i < 4; i++ ){
-        std::tie(gr[i],fit[i]) = Calibrate(hAmpRaw[i], 2*i); //The second argument in Calibrate is detector id
+        std::tie(gr[i],fit[i]) = Calibrate(hAmpRaw[i], 2*i, energy); //The second argument in Calibrate is detector id
         calibFile->WriteObject(gr[i],Form("calibGraph_ch%d",2*i)); //Write to root file
         calibFile->WriteObject(fit[i],Form("calibFit_ch%d",2*i)); //Write to root file
     }
