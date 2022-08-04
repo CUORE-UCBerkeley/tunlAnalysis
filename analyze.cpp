@@ -25,7 +25,7 @@ int main(int argc, char **argv){
     
     // This activates implicit multi-threading
     ROOT::EnableImplicitMT();
-
+    std::cout << "Code running?" << std::endl;
     std::string matname;
     int energy;
     std::string runs;
@@ -202,7 +202,7 @@ int main(int argc, char **argv){
         //Define Prompt such that (xbinmax - 500) < TOF < (xbinmax + 500)
         hE_Prompt[i]= new TH1D(Form("hE_Prompt_ch%d",kk),Form("hE_Prompt_ch%d",kk), 10000, 0, 10000);
         outTree->Draw(Form("energy_ch%d>>hE_Prompt_ch%d",kk,kk), \
-                    Form("tof_ch%d < abs(%f - 500)", kk, xbinmax), \
+                    Form("tof_ch%d > (%f - 500) && tof_ch%d < (%f + 500)", kk, xbinmax, kk, xbinmax), \
                     "goff");
         double promptRange = 1000;
         hE_Prompt[i]->Write();
@@ -218,7 +218,7 @@ int main(int argc, char **argv){
         //Define Late 
         hE_Late[i]= new TH1D(Form("hE_Late_ch%d",kk),Form("hE_Late_ch%d",kk), 10000, 0, 10000);
         outTree->Draw(Form("energy_ch%d>>hE_Late_ch%d",kk,kk), \
-                    Form("tof_ch%d > -4100 && tof_ch%d < (%f - 500)", kk, kk, xbinmax), \
+                    Form("tof_ch%d > (%f + 500) && tof_ch%d < 0", kk, xbinmax, kk), \
                     "goff");
         double lateRange = abs(0 - (xbinmax + 500));
         hE_Late[i]->Write();
@@ -226,8 +226,11 @@ int main(int argc, char **argv){
         //Estimate TOF corrected plot by subtracting accidental spectra from prompt spectra
         hE_tofCorr[i]= new TH1D(Form("hE_tofCorr_ch%d",kk),Form("hE_tofCorr_ch%d",kk), 10000, 0, 10000);
         hE_tofCorr[i]->Add(hE_Prompt[i], 1);
-        hE_tofCorr[i]->Add(hE_Early[i], - 0.5 * promptRange / earlyRange );
-        hE_tofCorr[i]->Add(hE_Late[i], - 0.5 * promptRange / lateRange );
+        std::cout << hE_tofCorr[i]->Integral() << std::endl;
+        hE_tofCorr[i]->Add(hE_Early[i], -0.5 * promptRange/earlyRange );
+        std::cout << hE_tofCorr[i]->Integral() << std::endl;
+        hE_tofCorr[i]->Add(hE_Late[i], -0.5 * promptRange/lateRange );
+        std::cout << hE_tofCorr[i]->Integral() << std::endl;
         hE_tofCorr[i]->Write();
 
     }

@@ -45,7 +45,7 @@ std::tuple<TGraphErrors*, TF1*> Calibrate( TH1D *hist, int channel, int energy){
     
     //Find peaks in the histogram for calibratio
     //Unpack the tuple elements returned by the function 
-    if(energy == 6 ){
+    if(energy == 6 || energy == 0){
         std::tie(xpos[0], xposErr[0]) = GetMaxInRange(hist, 4000, 7000);   //Get 511 position
         std::tie(xpos[1], xposErr[1]) = GetMaxInRange(hist, 13000, 16000); //Get 1460 position
         std::tie(xpos[2], xposErr[2]) = GetMaxInRange(hist, 25000, 28000); //Get 2615 position
